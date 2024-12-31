@@ -1,5 +1,7 @@
 # Readme
 
+<img src="jil-sander-readme-photo.png" alt="Jil Sander S/S 2012" width="500">
+
 ## DISCLAIMER
 This project is strictly for personal use and educational purposes. All content, including images and data, belongs to Vogue.
 
