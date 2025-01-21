@@ -1,6 +1,7 @@
 import re
 import csv
 import requests
+import os
 
 
 def fetch_and_save_html(url, file_name):
@@ -59,14 +60,20 @@ def extract_id_url_srcset(html):
     return rows
 
 
-def parse_to_csv(rows, output_file):
+def parse_to_csv(rows, filename="test_raw_collection_output.csv"):
     """save extracted data to csv"""
     fieldnames = ["index", "id", "url", "srcset"]
-    with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
+
+
+    output_folder = os.path.join(os.path.dirname(__file__), "..", "output")
+    os.makedirs(output_folder, exist_ok=True)
+    filepath = os.path.join(output_folder, filename)
+
+    with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"CSV written to {output_file}, with {len(rows)} rows.")
+    print(f"CSV written to {filepath}, with {len(rows)} rows.")
 
 
 def main():
@@ -87,8 +94,7 @@ def main():
         return
 
     # Step 3: Save extracted data to CSV
-    output_csv = "id_url_srcset.csv"
-    parse_to_csv(rows, output_csv)
+    parse_to_csv(rows)
 
 
 if __name__ == "__main__":

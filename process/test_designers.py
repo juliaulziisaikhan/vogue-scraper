@@ -1,3 +1,4 @@
+import os
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -36,17 +37,24 @@ def parse_designers(base_url):
 
 def save_designers_to_csv(designers, filename="test_designers_output.csv"):
     """save a list of designers to a csv file, each on a new line."""
-    with open(filename, 'w', newline='') as file:
+    # define the output directory path
+    output_folder = os.path.join(os.path.dirname(__file__), "..", "output")
+    # ensure the output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+    # construct the full path for the csv file
+    filepath = os.path.join(output_folder, filename)
+
+    with open(filepath, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerows([[designer] for designer in designers])  # wrap each designer in a list
-    print(f"designers saved to {filename}")
+    print(f"designers saved to {filepath}")
 
 def main():
     base_url = "https://www.vogue.com/fashion-shows/spring-2012-ready-to-wear"
     print(f"Testing designer link extraction from: {base_url}")
     designers = parse_designers(base_url)
     if designers:
-        print(f"found {len(designers)} designer links:")
+        print(f"Found {len(designers)} designer links:")
         save_designers_to_csv(designers)  # call the save function
         for link in designers[:5]:  # print only first 5 links
             print(link)
