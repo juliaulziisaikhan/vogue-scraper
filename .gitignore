@@ -1,2 +1,3 @@
 .DS_Store
-/samples # add any html samples to inspect structure manually
+# add any html samples to inspect structure manually
+/samples
