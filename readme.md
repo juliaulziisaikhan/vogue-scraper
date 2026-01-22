@@ -5,6 +5,44 @@
 ## DISCLAIMER
 This project is strictly for personal use and educational purposes. All content, including images and data, belongs to Vogue.
 
+## 1/21/26 Changes
+
+Consolidated scripts into 3 files with CLI arguments. Output is now nested by season and designer.
+
+```
+output/
+└── {season}/
+    ├── designers.csv
+    └── {designer}/
+        ├── images.csv
+        └── images/
+            ├── collection/
+            ├── details/
+            ├── beauty/
+            └── front-row/
+```
+
+### Usage
+
+```bash
+# activate venv
+source venv/bin/activate
+
+# get all designers for a season
+python process/extract_designers.py spring-2012-ready-to-wear
+
+# extract image URLs for a designer
+python process/extract_collection.py spring-2012-ready-to-wear jil-sander
+
+# download all images
+python process/download_images.py spring-2012-ready-to-wear jil-sander
+
+# download only 5 images per category (sample mode)
+python process/download_images.py spring-2012-ready-to-wear jil-sander 5
+```
+
+---
+
 ## What this repo can do as of right now
 
 Sample is for Jil Sander Spring 2023 Ready to Wear.
