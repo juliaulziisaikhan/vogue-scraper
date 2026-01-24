@@ -2,6 +2,9 @@ import os
 import json
 import csv
 import random
+import re
+import requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, jsonify, request, Response, send_from_directory
 
 # Import functions from existing scripts
@@ -11,6 +14,113 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
+SEASONS_FILE = os.path.join(OUTPUT_DIR, "seasons.json")
+DESIGNERS_FILE = os.path.join(OUTPUT_DIR, "designers.json")
+
+
+def fetch_seasons_from_vogue():
+    """Fetch all available seasons from Vogue's website"""
+    url = "https://www.vogue.com/fashion-shows/seasons"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    links = soup.find_all('a', href=re.compile(r'/fashion-shows/[a-z]+-\d{4}'))
+
+    seasons = set()
+    for link in links:
+        href = link.get('href', '')
+        match = re.search(r'/fashion-shows/([a-z]+-\d{4}[a-z-]*)', href)
+        if match:
+            seasons.add(match.group(1))
+
+    return sorted(seasons, reverse=True)
+
+
+def get_seasons_by_year(seasons_list):
+    """Organize seasons by year"""
+    by_year = {}
+    for season in seasons_list:
+        match = re.search(r'(\d{4})', season)
+        if match:
+            year = match.group(1)
+            if year not in by_year:
+                by_year[year] = []
+            by_year[year].append(season)
+
+    # Sort years descending, seasons within each year alphabetically
+    sorted_years = sorted(by_year.keys(), reverse=True)
+    return {year: sorted(by_year[year]) for year in sorted_years}
+
+
+def load_seasons_cache():
+    """Load seasons from cache file"""
+    if os.path.exists(SEASONS_FILE):
+        with open(SEASONS_FILE, 'r') as f:
+            return json.load(f)
+    return None
+
+
+def save_seasons_cache(seasons_list):
+    """Save seasons to cache file"""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    data = {
+        "seasons": seasons_list,
+        "by_year": get_seasons_by_year(seasons_list)
+    }
+    with open(SEASONS_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+    return data
+
+
+def fetch_designers_from_vogue(season):
+    """Fetch all designers for a season from Vogue's website"""
+    url = f"https://www.vogue.com/fashion-shows/{season}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Try multiple selectors for different page layouts
+    designers = set()
+
+    # Method 1: grouped-navigation__link (older pages)
+    for link in soup.select('a.grouped-navigation__link'):
+        href = link.get('href', '')
+        match = re.search(r'/fashion-shows/[^/]+/([^/]+)', href)
+        if match:
+            designers.add(match.group(1))
+
+    # Method 2: Any link containing the season path with a designer slug
+    if not designers:
+        for link in soup.find_all('a', href=re.compile(f'/fashion-shows/{re.escape(season)}/[^/]+')):
+            href = link.get('href', '')
+            match = re.search(r'/fashion-shows/[^/]+/([^/]+)', href)
+            if match and match.group(1) not in ['slideshow', 'reviews', 'details', 'beauty', 'front-row']:
+                designers.add(match.group(1))
+
+    return sorted(designers)
+
+
+def load_designers_cache():
+    """Load designers cache from file"""
+    if os.path.exists(DESIGNERS_FILE):
+        with open(DESIGNERS_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def save_designers_cache(cache):
+    """Save designers cache to file"""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    with open(DESIGNERS_FILE, 'w') as f:
+        json.dump(cache, f, indent=2)
 
 
 def get_collections():
@@ -180,6 +290,45 @@ def index():
 @app.route("/api/collections")
 def api_collections():
     return jsonify(get_collections())
+
+
+@app.route("/api/seasons")
+def api_seasons():
+    """Get all available seasons, organized by year"""
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+
+    if not refresh:
+        cached = load_seasons_cache()
+        if cached:
+            return jsonify(cached)
+
+    # Fetch fresh from Vogue
+    try:
+        seasons_list = fetch_seasons_from_vogue()
+        data = save_seasons_cache(seasons_list)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/designers/<season>")
+def api_designers(season):
+    """Get all designers for a season"""
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+
+    cache = load_designers_cache()
+
+    if not refresh and season in cache:
+        return jsonify({"season": season, "designers": cache[season]})
+
+    # Fetch fresh from Vogue
+    try:
+        designers = fetch_designers_from_vogue(season)
+        cache[season] = designers
+        save_designers_cache(cache)
+        return jsonify({"season": season, "designers": designers})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/extract", methods=["POST"])

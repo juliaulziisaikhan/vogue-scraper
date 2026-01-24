@@ -337,10 +337,162 @@
             padding: 2rem;
             color: #666;
         }
+
+        /* Season browser */
+        .season-browser {
+            margin-bottom: 2rem;
+        }
+
+        .season-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .season-header h2 {
+            margin-bottom: 0;
+        }
+
+        .year-tabs {
+            display: flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.5rem;
+        }
+
+        .year-tab {
+            padding: 0.25rem 0.5rem;
+            background: none;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .year-tab:hover {
+            color: #000;
+        }
+
+        .year-tab.active {
+            background: #000;
+            color: #fff;
+            border-color: #000;
+        }
+
+        .season-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .season-chip {
+            padding: 0.375rem 0.75rem;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: #000;
+        }
+
+        .season-chip:hover {
+            border-color: #000;
+            background: #fff;
+            color: #000;
+        }
+
+        .refresh-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* Designer search */
+        .designer-search {
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .designer-search.active {
+            display: block;
+        }
+
+        .designer-search-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .designer-search-header span {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .designer-search input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #ddd;
+            font-size: 0.875rem;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .designer-search input:focus {
+            outline: 2px solid #000;
+            outline-offset: 1px;
+            border-color: #000;
+        }
+
+        .designer-results {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .designer-chip {
+            padding: 0.375rem 0.75rem;
+            background: #fff;
+            border: 1px solid #000;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: #000;
+        }
+
+        .designer-chip:hover {
+            background: #000;
+            color: #fff;
+        }
+
+        .designer-loading {
+            font-size: 0.75rem;
+            color: #666;
+            padding: 0.5rem 0;
+        }
     </style>
 </head>
 <body>
     <h1>Vogue Scraper</h1>
+
+    <section class="season-browser">
+        <div class="season-header">
+            <h2>Browse Seasons</h2>
+            <button class="secondary refresh-btn" onclick="loadSeasons(true)">Refresh</button>
+        </div>
+        <div id="yearTabs" class="year-tabs">Loading seasons...</div>
+        <div id="seasonList" class="season-list"></div>
+        <div id="designerSearch" class="designer-search">
+            <div class="designer-search-header">
+                <span id="designerSeasonLabel">Designers:</span>
+                <button class="secondary refresh-btn" onclick="loadDesigners(selectedSeasonForDesigners, true)">Refresh</button>
+            </div>
+            <input type="text" id="designerInput" placeholder="Search designers..." oninput="filterDesigners()">
+            <div id="designerResults" class="designer-results"></div>
+        </div>
+    </section>
 
     <section>
         <h2>New Collection</h2>
@@ -391,6 +543,10 @@
     <script>
         let currentSeason = '';
         let currentDesigner = '';
+        let seasonsData = null;
+        let selectedYear = null;
+        let designersData = [];
+        let selectedSeasonForDesigners = null;
 
         function showStatus(message, isError = false) {
             const el = document.getElementById('statusMessage');
@@ -618,8 +774,129 @@
             }
         });
 
-        // Load collections on page load
+        async function loadSeasons(refresh = false) {
+            const yearTabs = document.getElementById('yearTabs');
+            const seasonList = document.getElementById('seasonList');
+
+            yearTabs.innerHTML = 'Loading seasons...';
+            seasonList.innerHTML = '';
+
+            try {
+                const url = refresh ? '/api/seasons?refresh=true' : '/api/seasons';
+                const response = await fetch(url);
+                seasonsData = await response.json();
+
+                if (seasonsData.error) {
+                    yearTabs.innerHTML = `Error: ${seasonsData.error}`;
+                    return;
+                }
+
+                const years = Object.keys(seasonsData.by_year).sort((a, b) => b - a);
+                selectedYear = selectedYear || years[0];
+
+                yearTabs.innerHTML = years.map(year =>
+                    `<button class="year-tab ${year === selectedYear ? 'active' : ''}" onclick="selectYear('${year}')">${year}</button>`
+                ).join('');
+
+                renderSeasons();
+            } catch (err) {
+                yearTabs.innerHTML = `Error: ${err.message}`;
+            }
+        }
+
+        function selectYear(year) {
+            selectedYear = year;
+            document.querySelectorAll('.year-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.textContent === year);
+            });
+            renderSeasons();
+        }
+
+        function renderSeasons() {
+            const seasonList = document.getElementById('seasonList');
+            const seasons = seasonsData.by_year[selectedYear] || [];
+
+            seasonList.innerHTML = seasons.map(season => {
+                // Format nicely: spring-2024-ready-to-wear -> Spring Ready-to-Wear
+                const parts = season.replace(`-${selectedYear}`, '').split('-');
+                const label = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+                return `<button class="season-chip" onclick="selectSeason('${season}')">${label}</button>`;
+            }).join('');
+        }
+
+        function selectSeason(season) {
+            document.getElementById('season').value = season;
+            currentSeason = season;
+            document.getElementById('downloadBtn').disabled = true;
+            // Load designers for this season
+            loadDesigners(season);
+        }
+
+        async function loadDesigners(season, refresh = false) {
+            const searchDiv = document.getElementById('designerSearch');
+            const label = document.getElementById('designerSeasonLabel');
+            const results = document.getElementById('designerResults');
+            const input = document.getElementById('designerInput');
+
+            selectedSeasonForDesigners = season;
+            searchDiv.classList.add('active');
+            label.textContent = `Designers for ${season}:`;
+            results.innerHTML = '<div class="designer-loading">Loading designers...</div>';
+            input.value = '';
+
+            try {
+                const url = refresh
+                    ? `/api/designers/${encodeURIComponent(season)}?refresh=true`
+                    : `/api/designers/${encodeURIComponent(season)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.error) {
+                    results.innerHTML = `<div class="designer-loading">Error: ${data.error}</div>`;
+                    return;
+                }
+
+                designersData = data.designers;
+                label.textContent = `${designersData.length} designers in ${season}:`;
+                filterDesigners();
+            } catch (err) {
+                results.innerHTML = `<div class="designer-loading">Error: ${err.message}</div>`;
+            }
+        }
+
+        function filterDesigners() {
+            const input = document.getElementById('designerInput').value.toLowerCase();
+            const results = document.getElementById('designerResults');
+
+            let filtered = designersData;
+            if (input) {
+                filtered = designersData.filter(d => d.toLowerCase().includes(input));
+            }
+
+            // Show max 30 results
+            const shown = filtered.slice(0, 30);
+            const remaining = filtered.length - shown.length;
+
+            if (filtered.length === 0) {
+                results.innerHTML = '<div class="designer-loading">No matches found</div>';
+                return;
+            }
+
+            results.innerHTML = shown.map(d =>
+                `<button class="designer-chip" onclick="selectDesigner('${d}')">${d}</button>`
+            ).join('') + (remaining > 0 ? `<span class="designer-loading">+${remaining} more</span>` : '');
+        }
+
+        function selectDesigner(designer) {
+            document.getElementById('designer').value = designer;
+            currentDesigner = designer;
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('designer').focus();
+        }
+
+        // Load collections and seasons on page load
         loadCollections();
+        loadSeasons();
     </script>
 </body>
 </html>
