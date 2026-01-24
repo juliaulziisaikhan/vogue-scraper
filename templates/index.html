@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vogue Scraper</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #fff;
+            color: #000;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #000;
+            padding-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #000;
+            font-size: 0.875rem;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        input[type="text"]:focus {
+            outline: 2px solid #000;
+            outline-offset: 1px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: #000;
+            color: #fff;
+            border: 1px solid #000;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        button:disabled {
+            background: #999;
+            border-color: #999;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #fff;
+            color: #000;
+        }
+
+        button.secondary:hover {
+            background: #f0f0f0;
+        }
+
+        button.secondary:disabled {
+            background: #f0f0f0;
+            color: #999;
+        }
+
+        .progress-container {
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            border: 1px solid #000;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #000;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .log-container {
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .log-container.active {
+            display: block;
+        }
+
+        .log-window {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.75rem;
+            padding: 0.5rem;
+        }
+
+        .log-entry {
+            padding: 0.125rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.error {
+            color: #c00;
+        }
+
+        .collections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .collection-card {
+            border: 1px solid #ddd;
+            overflow: hidden;
+        }
+
+        .collection-card:hover {
+            border-color: #000;
+        }
+
+        .collection-thumbnail {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .collection-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .collection-thumbnail .no-image {
+            color: #999;
+            font-size: 0.75rem;
+        }
+
+        .collection-info {
+            padding: 1rem;
+        }
+
+        .collection-season {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .collection-designer {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .collection-stats {
+            font-size: 0.75rem;
+            color: #666;
+        }
+
+        .collection-actions {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .collection-actions button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+            border: 1px dashed #ddd;
+        }
+
+        .status-message {
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .status-message.success {
+            display: block;
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+        }
+
+        .status-message.error {
+            display: block;
+            background: #ffebee;
+            border: 1px solid #f44336;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #fff;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-body {
+            padding: 1rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .missed-url {
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+            font-size: 0.75rem;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .missed-url:last-child {
+            border-bottom: none;
+        }
+
+        .missed-url a {
+            color: #000;
+        }
+
+        .missed-summary {
+            padding: 0.75rem;
+            background: #f5f5f5;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .no-missed {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vogue Scraper</h1>
+
+    <section>
+        <h2>New Collection</h2>
+        <div class="controls">
+            <input type="text" id="season" placeholder="Season (e.g., spring-2012-ready-to-wear)">
+            <input type="text" id="designer" placeholder="Designer (e.g., jil-sander)">
+        </div>
+        <div class="buttons">
+            <button id="extractBtn" onclick="extractLinks()">Extract Links</button>
+            <button id="downloadBtn" class="secondary" onclick="downloadImages()" disabled>Download Images</button>
+        </div>
+    </section>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <div id="progressContainer" class="progress-container">
+        <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+        </div>
+        <div id="progressText" class="progress-text">0 / 0 urls downloaded</div>
+    </div>
+
+    <div id="logContainer" class="log-container">
+        <h2>Activity Log</h2>
+        <div id="logWindow" class="log-window"></div>
+    </div>
+
+    <section>
+        <h2>Downloaded Collections</h2>
+        <div id="collectionsGrid" class="collections-grid">
+            <div class="empty-state">Loading...</div>
+        </div>
+    </section>
+
+    <!-- Missed URLs Modal -->
+    <div id="missedModal" class="modal-overlay" onclick="closeMissedModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="missedModalTitle">Missed URLs</h3>
+                <button class="modal-close" onclick="closeMissedModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="missedModalBody">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSeason = '';
+        let currentDesigner = '';
+
+        function showStatus(message, isError = false) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = 'status-message ' + (isError ? 'error' : 'success');
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').className = 'status-message';
+        }
+
+        function addLog(message, isError = false) {
+            const logWindow = document.getElementById('logWindow');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry' + (isError ? ' error' : '');
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logWindow.appendChild(entry);
+            logWindow.scrollTop = logWindow.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logWindow').innerHTML = '';
+        }
+
+        function updateProgress(completed, total) {
+            const percent = total > 0 ? (completed / total) * 100 : 0;
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = `${completed} / ${total} urls downloaded`;
+        }
+
+        async function extractLinks() {
+            const season = document.getElementById('season').value.trim();
+            const designer = document.getElementById('designer').value.trim();
+
+            if (!season || !designer) {
+                showStatus('Please enter both season and designer', true);
+                return;
+            }
+
+            hideStatus();
+            document.getElementById('extractBtn').disabled = true;
+            document.getElementById('logContainer').classList.add('active');
+            clearLog();
+            addLog(`Extracting links for ${designer} - ${season}...`);
+
+            try {
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ season, designer })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showStatus(data.error, true);
+                    addLog(data.error, true);
+                } else {
+                    currentSeason = season;
+                    currentDesigner = designer;
+                    showStatus(`Found ${data.total} images: ${Object.entries(data.categories).filter(([k,v]) => v > 0).map(([k,v]) => `${k}: ${v}`).join(', ')}`);
+                    addLog(`Extracted ${data.total} image URLs`);
+                    document.getElementById('downloadBtn').disabled = false;
+                    loadCollections();
+                }
+            } catch (err) {
+                showStatus('Network error: ' + err.message, true);
+                addLog('Network error: ' + err.message, true);
+            }
+
+            document.getElementById('extractBtn').disabled = false;
+        }
+
+        function downloadImages(season = null, designer = null) {
+            season = season || currentSeason || document.getElementById('season').value.trim();
+            designer = designer || currentDesigner || document.getElementById('designer').value.trim();
+
+            if (!season || !designer) {
+                showStatus('Please enter both season and designer', true);
+                return;
+            }
+
+            hideStatus();
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('extractBtn').disabled = true;
+            document.getElementById('progressContainer').classList.add('active');
+            document.getElementById('logContainer').classList.add('active');
+            clearLog();
+            updateProgress(0, 0);
+
+            const eventSource = new EventSource(`/api/download/${encodeURIComponent(season)}/${encodeURIComponent(designer)}`);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    addLog(data.message);
+                } else if (data.type === 'progress') {
+                    updateProgress(data.completed, data.total);
+                } else if (data.type === 'error') {
+                    showStatus(data.message, true);
+                    addLog(data.message, true);
+                    eventSource.close();
+                    resetButtons();
+                } else if (data.type === 'done') {
+                    showStatus('Download complete!');
+                    eventSource.close();
+                    resetButtons();
+                    loadCollections();
+                }
+            };
+
+            eventSource.onerror = function() {
+                showStatus('Connection lost', true);
+                addLog('Connection lost', true);
+                eventSource.close();
+                resetButtons();
+            };
+        }
+
+        function resetButtons() {
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('extractBtn').disabled = false;
+        }
+
+        async function loadCollections() {
+            try {
+                const response = await fetch('/api/collections');
+                const collections = await response.json();
+
+                const grid = document.getElementById('collectionsGrid');
+
+                if (collections.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No collections yet. Extract some links to get started.</div>';
+                    return;
+                }
+
+                grid.innerHTML = collections.map(c => `
+                    <div class="collection-card">
+                        <div class="collection-thumbnail">
+                            ${c.thumbnail
+                                ? `<img src="${c.thumbnail}" alt="${c.designer}" loading="lazy">`
+                                : '<span class="no-image">No images</span>'}
+                        </div>
+                        <div class="collection-info">
+                            <div class="collection-season">${c.season}</div>
+                            <div class="collection-designer">${c.designer}</div>
+                            <div class="collection-stats">
+                                ${c.images_downloaded} / ${c.urls_extracted} urls downloaded
+                            </div>
+                            <div class="collection-actions">
+                                <button onclick="viewCollection('${c.season}', '${c.designer}')">View</button>
+                                <button class="secondary" onclick="showMissedUrls('${c.season}', '${c.designer}')">Missed URLs</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load collections:', err);
+            }
+        }
+
+        function viewCollection(season, designer) {
+            window.open(`/view/${season}/${designer}`, '_blank');
+        }
+
+        async function showMissedUrls(season, designer) {
+            const modal = document.getElementById('missedModal');
+            const title = document.getElementById('missedModalTitle');
+            const body = document.getElementById('missedModalBody');
+
+            title.textContent = `Missed URLs - ${designer}`;
+            body.innerHTML = 'Loading...';
+            modal.classList.add('active');
+
+            try {
+                const response = await fetch(`/api/missed/${encodeURIComponent(season)}/${encodeURIComponent(designer)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    body.innerHTML = `<div class="no-missed">${data.error}</div>`;
+                    return;
+                }
+
+                if (data.missed.length === 0) {
+                    body.innerHTML = `
+                        <div class="missed-summary">All ${data.total_urls} URLs have been downloaded.</div>
+                        <div class="no-missed">No missed URLs!</div>
+                    `;
+                    return;
+                }
+
+                body.innerHTML = `
+                    <div class="missed-summary">
+                        <span>${data.missed.length} of ${data.total_urls} URLs not downloaded</span>
+                        <button onclick="downloadFromModal('${season}', '${designer}')">Download Missing</button>
+                    </div>
+                    ${data.missed.map(m => `
+                        <div class="missed-url">
+                            <a href="${m.image_url}" target="_blank">${m.id}</a>
+                            <br><small>${m.url}</small>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (err) {
+                body.innerHTML = `<div class="no-missed">Error: ${err.message}</div>`;
+            }
+        }
+
+        function closeMissedModal(event) {
+            if (!event || event.target === event.currentTarget) {
+                document.getElementById('missedModal').classList.remove('active');
+            }
+        }
+
+        function downloadFromModal(season, designer) {
+            closeMissedModal();
+            downloadImages(season, designer);
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMissedModal();
+            }
+        });
+
+        // Load collections on page load
+        loadCollections();
+    </script>
+</body>
+</html>

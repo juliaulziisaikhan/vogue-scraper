@@ -1,3 +1,5 @@
 .DS_Store
+__pycache__/
+venv/
 # ignore downloaded images (can re-download using CSVs)
 **/images/
